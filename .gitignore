@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Logs / runtime
+*.log
+*.log.err
+*.pid
+miner-gui.json
+.btx-miner-gui.json
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# Build scratch (the prebuilt bin/ IS committed; build trees are not)
+build/
+btx-src/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+!bin/*
+
+# Backups
+*.bak

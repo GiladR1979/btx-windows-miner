@@ -1,0 +1,85 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index faa9fab..bcd47d9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -381,6 +381,9 @@ if(WIN32)
+     _WIN32_IE=0x0A00
+     WIN32_LEAN_AND_MEAN
+     NOMINMAX
++    # windows.h otherwise #defines STRICT=1, which mangles the
++    # ReorgProtectionProfile::STRICT enumerator (kernel/chainstatemanager_opts.h).
++    NO_STRICT
+   )
+ 
+   if(MSVC)
+@@ -395,11 +398,16 @@ if(WIN32)
+     target_compile_definitions(core_interface INTERFACE
+       _UNICODE;UNICODE
+     )
++    # NOTE: these MSVC switches must be CXX-only. nvcc treats a bare "/utf-8"
++    # as an input file and aborts ("A single input file is required ...").
++    # So gate them to C++ TUs and forward the essential ones to the CUDA host
++    # compiler via -Xcompiler for .cu host-side code.
+     target_compile_options(core_interface INTERFACE
+-      /utf-8
+-      /Zc:preprocessor
+-      /Zc:__cplusplus
+-      /sdl
++      $<$<COMPILE_LANGUAGE:CXX>:/utf-8;/Zc:preprocessor;/Zc:__cplusplus;/sdl>
++      $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>
++      $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>
++      $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:__cplusplus>
++      $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/sdl>
+     )
+     # Improve parallelism in MSBuild.
+     # See: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/.
+@@ -550,13 +558,11 @@ include(cmake/ccache.cmake)
+ add_library(warn_interface INTERFACE)
+ target_link_libraries(core_interface INTERFACE warn_interface)
+ if(MSVC)
+-  try_append_cxx_flags("/W3" TARGET warn_interface SKIP_LINK)
+-  try_append_cxx_flags("/wd4018" TARGET warn_interface SKIP_LINK)
+-  try_append_cxx_flags("/wd4146" TARGET warn_interface SKIP_LINK)
+-  try_append_cxx_flags("/wd4244" TARGET warn_interface SKIP_LINK)
+-  try_append_cxx_flags("/wd4267" TARGET warn_interface SKIP_LINK)
+-  try_append_cxx_flags("/wd4715" TARGET warn_interface SKIP_LINK)
+-  try_append_cxx_flags("/wd4805" TARGET warn_interface SKIP_LINK)
++  # CXX-only: nvcc chokes on bare "/W3"-style switches (treats them as input
++  # files). These are warning controls, irrelevant to .cu device/host code.
++  target_compile_options(warn_interface INTERFACE
++    $<$<COMPILE_LANGUAGE:CXX>:/W3;/wd4018;/wd4146;/wd4244;/wd4267;/wd4715;/wd4805>
++  )
+   target_compile_definitions(warn_interface INTERFACE
+     _CRT_SECURE_NO_WARNINGS
+     _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 2460c03..390a3bc 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -931,6 +931,26 @@ if(BUILD_UTIL)
+     )
+   endif()
+   install_binary_component(btx-genesis)
++
++  # External-miner solver. Ported from /root/btx (v0.29.7 base) into the
++  # v0.32.2 tree so it links against the V2-aware SolveMatMul. No source
++  # changes needed — the V2 seed derivation is encapsulated inside
++  # SetDeterministicMatMulSeeds, called per nonce from SolveMatMulNonceSeeded.
++  add_executable(btx-gbt-solve btx-gbt-solve.cpp)
++  target_include_directories(btx-gbt-solve PRIVATE
++    $<TARGET_PROPERTY:univalue,INTERFACE_INCLUDE_DIRECTORIES>
++  )
++  target_link_libraries(btx-gbt-solve
++    core_interface
++  )
++  if(UNIX AND NOT APPLE)
++    target_link_btx_linux_archive_group(btx-gbt-solve -Wl,--whole-archive bitcoin_common -Wl,--no-whole-archive ${BTX_NODE_ARCHIVES})
++  else()
++    target_link_libraries(btx-gbt-solve
++      bitcoin_shielded
++    )
++  endif()
++  install_binary_component(btx-gbt-solve)
+ endif()
+ 
+ 
