@@ -44,7 +44,7 @@ CONFIG_PATH = Path.home() / ".btx-miner-gui.json"
 DEFAULTS = {
     "wallet": "",
     "worker": socket.gethostname().lower().replace(" ", "-") or "rig1",
-    "pool": "minebtx.com:3333",
+    "pool": "pool.minebtx.com:3333",
     "solver": str(REPO_DIR / "bin" / "btx-gbt-solve.exe"),
     "threads": "8",
     "prepare_workers": "16",

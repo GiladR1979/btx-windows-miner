@@ -37,7 +37,7 @@ layer**, and ships a simple GUI where you paste your wallet address and press **
 
 **Run it**
 1. Download / clone this repo.
-2. Double‑click **`start-gui.bat`** (or run `python gui/btx_miner_gui.py`).
+2. Double‑click **`start-gui.bat`** (or run `python gui/btx_miner_gui.py`). *Optional:* run `install-desktop-shortcut.ps1` once to drop a **Desktop shortcut** (with icon) that launches the GUI.
 3. Paste your **BTX wallet address** (`btx1z…`) into the **Wallet address** box.
 4. Press **▶ Start Mining**.
 
