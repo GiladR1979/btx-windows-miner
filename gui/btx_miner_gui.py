@@ -78,6 +78,7 @@ class MinerGUI:
         self.rejected = 0
         self.blocks = 0
         self.hashrate = "—"
+        self.difficulty = "—"
 
         self.cfg = self._load_config()
 
@@ -239,14 +240,14 @@ class MinerGUI:
         stats.pack(fill="x", **pad)
         self.stat_vals = {}
         for i, (key, label) in enumerate([
-            ("hashrate", "HASHRATE"), ("accepted", "ACCEPTED"),
+            ("difficulty", "POOL DIFF"), ("accepted", "ACCEPTED"),
             ("rejected", "REJECTED"), ("blocks", "BLOCKS"), ("uptime", "UPTIME"),
         ]):
             cell = tk.Frame(stats, bg=BG2)
             cell.grid(row=0, column=i, sticky="nsew", padx=2, pady=8)
             stats.columnconfigure(i, weight=1)
             v = tk.Label(cell, text="—", font=self.f_stat, bg=BG2,
-                         fg=ACCENT if key == "hashrate" else FG)
+                         fg=ACCENT if key == "difficulty" else FG)
             v.pack()
             tk.Label(cell, text=label, font=self.f_statlbl, bg=BG2, fg=MUTED).pack()
             self.stat_vals[key] = v
@@ -464,7 +465,7 @@ class MinerGUI:
     @staticmethod
     def _tag_for(line: str) -> str:
         low = line.lower()
-        if "accepted" in low or "block found" in low:
+        if "share ok" in low or "accepted" in low or "block found" in low:
             return "ok"
         if "reject" in low or "error" in low or "fail" in low:
             return "bad"
@@ -474,29 +475,36 @@ class MinerGUI:
 
     _re_totals = re.compile(r"accepted=(\d+)\s+rejected=(\d+)\s+blocks=(\d+)")
     _re_hash = re.compile(r"([\d.]+)\s*(KN/s|MN/s|N/s|nps|H/s|kH/s|MH/s|GH/s)", re.I)
+    _re_arb = re.compile(r"a/r/b=(\d+)/(\d+)/(\d+)")           # "share OK ... (a/r/b=N/M/K)"
+    _re_ar = re.compile(r"a/r=(\d+)/(\d+)")                     # "share REJECTED ... (a/r=N/M)"
+    _re_diff = re.compile(r"difficulty set to ([\d.]+)", re.I)
 
     def _parse_stats(self, line: str) -> None:
-        low = line.lower()
-        m = self._re_totals.search(line)
+        # The miner logs authoritative running totals on every share:
+        #   "share OK job=… nonce=… (a/r/b=1/0/0)"
+        #   "share REJECTED job=… nonce=… (a/r=0/1)"
+        m = self._re_arb.search(line)
         if m:
-            self.accepted = int(m.group(1))
-            self.rejected = int(m.group(2))
-            self.blocks = int(m.group(3))
+            self.accepted, self.rejected, self.blocks = int(m.group(1)), int(m.group(2)), int(m.group(3))
         else:
-            # incremental share events
-            if "share accepted" in low or ("accepted" in low and "share" in low):
-                self.accepted += 1
-            elif "share rejected" in low or ("rejected" in low and "share" in low):
-                self.rejected += 1
-            if "block found" in low or "submitted block" in low or "found block" in low:
-                self.blocks += 1
+            mt = self._re_totals.search(line)          # "totals: accepted=… rejected=… blocks=…"
+            if mt:
+                self.accepted, self.rejected, self.blocks = int(mt.group(1)), int(mt.group(2)), int(mt.group(3))
+            else:
+                mr = self._re_ar.search(line)
+                if mr:
+                    self.accepted, self.rejected = int(mr.group(1)), int(mr.group(2))
+        d = self._re_diff.search(line)                 # live pool vardiff
+        if d:
+            val = float(d.group(1))
+            self.difficulty = f"{int(val):,}" if val >= 1 else str(val)
         h = self._re_hash.search(line)
         if h:
             self.hashrate = f"{h.group(1)} {h.group(2)}"
 
     def _tick(self) -> None:
         # update stats bar
-        self.stat_vals["hashrate"].config(text=self.hashrate)
+        self.stat_vals["difficulty"].config(text=self.difficulty)
         self.stat_vals["accepted"].config(text=str(self.accepted))
         self.stat_vals["rejected"].config(text=str(self.rejected))
         self.stat_vals["blocks"].config(text=str(self.blocks))
