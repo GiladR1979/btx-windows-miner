@@ -37,6 +37,8 @@ import json
 import logging
 import os
 import signal
+import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -225,6 +227,10 @@ class GbtSolveWrapper:
         # with "Separator is not found, and chunk exceed the limit" and we
         # respawn the daemon — losing all the cost savings the persistent
         # process was supposed to provide.
+        # Windows: suppress the solver's console window. When the miner runs
+        # windowless (launched from the GUI), a console child would otherwise pop
+        # its own window. stdio still flows through the pipes regardless.
+        _cf = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         self._daemon = await asyncio.create_subprocess_exec(
             *cmd,
             env=env,
@@ -232,6 +238,7 @@ class GbtSolveWrapper:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             limit=16 * 1024 * 1024,
+            creationflags=_cf,
         )
         # Wait for daemon_ready handshake on stderr (with timeout — if the
         # binary lacks --daemon support or fails to init CUDA, we want to

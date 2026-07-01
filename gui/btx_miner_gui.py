@@ -361,8 +361,20 @@ class MinerGUI:
         self.lbl_state.config(text="● Idle", fg=MUTED)
         self._set_inputs_state("normal")
 
+    @staticmethod
+    def _python_exe() -> str:
+        # Never launch the miner with pythonw.exe: under pythonw sys.stderr is
+        # None, so the miner's logging (which we stream into the status panel) is
+        # lost and its async subprocess handling misbehaves. Prefer python.exe.
+        py = sys.executable
+        if py.lower().endswith("pythonw.exe"):
+            cand = py[:-len("pythonw.exe")] + "python.exe"
+            if Path(cand).exists():
+                return cand
+        return py
+
     def _build_command(self, wallet: str, pool: str, solver: str) -> list[str]:
-        cmd = [sys.executable, "-m", "dexbtx_miner",
+        cmd = [self._python_exe(), "-m", "dexbtx_miner",
                "--pool", pool,
                "--address", wallet,
                "--worker", self.var_worker.get().strip() or "default",
