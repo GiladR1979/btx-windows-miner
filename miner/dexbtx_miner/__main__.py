@@ -18,8 +18,24 @@ import contextlib
 import dataclasses
 import logging
 import os
+import subprocess
 import sys
 from pathlib import Path
+
+# Windows: force EVERY child process (nvidia-smi/wmic telemetry, the solver,
+# pip, …) to spawn WITHOUT a console window. When the miner runs windowless
+# (launched from the GUI) an unflagged console child pops its own window — a
+# periodic nvidia-smi telemetry poll then flashes windows constantly. Patching
+# Popen once here covers every subprocess path in the process.
+if sys.platform == "win32":  # pragma: no cover
+    _CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    _orig_popen_init = subprocess.Popen.__init__
+
+    def _popen_init_no_window(self, *args, **kwargs):
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | _CREATE_NO_WINDOW
+        _orig_popen_init(self, *args, **kwargs)
+
+    subprocess.Popen.__init__ = _popen_init_no_window
 
 from . import hardware
 from .config import MinerConfig, load_yaml_config

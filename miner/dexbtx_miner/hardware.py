@@ -24,11 +24,16 @@ log = logging.getLogger(__name__)
 # stall the mining session.
 SUBPROCESS_TIMEOUT_SEC = 5.0
 
+# Windows: never let nvidia-smi / wmic pop a console window when the miner runs
+# windowless (e.g. launched from the GUI). getattr() -> 0 (no-op) elsewhere.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def _run(cmd: list[str]) -> str | None:
     try:
         out = subprocess.check_output(
-            cmd, stderr=subprocess.DEVNULL, timeout=SUBPROCESS_TIMEOUT_SEC
+            cmd, stderr=subprocess.DEVNULL, timeout=SUBPROCESS_TIMEOUT_SEC,
+            creationflags=_NO_WINDOW,
         )
         return out.decode("utf-8", errors="replace").strip()
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
@@ -442,7 +447,7 @@ def _probe_power_cap_writable() -> bool:
         # Read current power limit
         cur = subprocess.run(
             ["nvidia-smi", "--query-gpu=power.limit", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, creationflags=_NO_WINDOW,
         )
         if cur.returncode != 0 or not cur.stdout.strip():
             return False
@@ -453,7 +458,7 @@ def _probe_power_cap_writable() -> bool:
         # No-op set
         probe = subprocess.run(
             ["nvidia-smi", "-i", "0", "-pl", str(limit)],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, creationflags=_NO_WINDOW,
         )
         return probe.returncode == 0
     except Exception:
