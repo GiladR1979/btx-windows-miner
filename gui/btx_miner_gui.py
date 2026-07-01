@@ -43,7 +43,11 @@ CONFIG_PATH = Path.home() / ".btx-miner-gui.json"
 
 DEFAULTS = {
     "wallet": "",
-    "worker": socket.gethostname().lower().replace(" ", "-") or "rig1",
+    # Use the machine's established name (COMPUTERNAME on Windows). A pool
+    # calibrates difficulty per worker-name; a BRAND-NEW name triggers a slow
+    # ~5-min ramp where shares are sparse (looks dead). A stable/known name the
+    # pool already has history for settles instantly. So DON'T randomize this.
+    "worker": os.environ.get("COMPUTERNAME") or socket.gethostname() or "rig1",
     "pool": "pool.minebtx.com:3333",
     "solver": str(REPO_DIR / "bin" / "btx-gbt-solve.exe"),
     "threads": "8",
