@@ -511,6 +511,12 @@ class MinerGUI:
         if self.start_time and self.proc is not None:
             s = int(time.time() - self.start_time)
             self.stat_vals["uptime"].config(text=f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}")
+            # The pool ramps a fresh worker's difficulty over the first ~5 min;
+            # shares are sparse until it settles. Show that instead of looking dead.
+            if self.accepted == 0 and s < 420:
+                self.lbl_state.config(text="● Mining · warming up (first shares ~5 min)…", fg=ACCENT)
+            else:
+                self.lbl_state.config(text="● Mining", fg=GREEN)
         self.root.after(1000, self._tick)
 
     # ── log helpers ────────────────────────────────────────────────────────────
